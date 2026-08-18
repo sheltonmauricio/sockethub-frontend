@@ -1,4 +1,7 @@
 import { createConnection } from "node:net";
+import {
+  randomUUID
+} from "node:crypto";
 
 import { MessageParser } from "../protocol/parser.js";
 import { serializeMessage } from "../protocol/serializer.js";
@@ -165,5 +168,43 @@ export class TcpClient {
       this.socket !== null &&
       !this.socket.destroyed
     );
+  }
+
+  getGroups() {
+    this.send({
+      type: "GET_GROUPS",
+      requestId: randomUUID(),
+      payload: {}
+    });
+  }
+
+  createGroup(name) {
+    this.send({
+      type: "CREATE_GROUP",
+      requestId: randomUUID(),
+      payload: {
+        name
+      }
+    });
+  }
+
+  joinGroup(groupId) {
+    this.send({
+      type: "JOIN_GROUP",
+      requestId: randomUUID(),
+      payload: {
+        groupId
+      }
+    });
+  }
+
+  leaveGroup(groupId) {
+    this.send({
+      type: "LEAVE_GROUP",
+      requestId: randomUUID(),
+      payload: {
+        groupId
+      }
+    });
   }
 }

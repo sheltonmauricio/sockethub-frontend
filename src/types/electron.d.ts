@@ -15,6 +15,20 @@ interface ElectronTcpApi {
     password: string
   ): Promise<void>;
 
+  getGroups(): Promise<void>;
+
+  createGroup(
+    name: string
+  ): Promise<void>;
+
+  joinGroup(
+    groupId: number
+  ): Promise<void>;
+
+  leaveGroup(
+    groupId: number
+  ): Promise<void>;
+
   isConnected(): Promise<boolean>;
 
   onMessage(

@@ -32,6 +32,29 @@ contextBridge.exposeInMainWorld(
           password
         ),
 
+      getGroups: () =>
+        ipcRenderer.invoke(
+          "tcp:get-groups"
+        ),
+
+      createGroup: (name) =>
+        ipcRenderer.invoke(
+          "tcp:create-group",
+          name
+        ),
+
+      joinGroup: (groupId) =>
+        ipcRenderer.invoke(
+          "tcp:join-group",
+          groupId
+        ),
+
+      leaveGroup: (groupId) =>
+        ipcRenderer.invoke(
+          "tcp:leave-group",
+          groupId
+        ),
+
       isConnected: () =>
         ipcRenderer.invoke(
           "tcp:is-connected"

@@ -107,6 +107,34 @@ app.whenReady().then(() => {
     }
   );
 
+  ipcMain.handle(
+    "tcp:get-groups",
+    () => {
+      return tcpClient.getGroups();
+    }
+  );
+
+  ipcMain.handle(
+    "tcp:create-group",
+    (_, name) => {
+      return tcpClient.createGroup(name);
+    }
+  );
+
+  ipcMain.handle(
+    "tcp:join-group",
+    (_, groupId) => {
+      return tcpClient.joinGroup(groupId);
+    }
+  );
+
+  ipcMain.handle(
+    "tcp:leave-group",
+    (_, groupId) => {
+      return tcpClient.leaveGroup(groupId);
+    }
+  );
+
   createWindow();
 
   app.on("activate", () => {

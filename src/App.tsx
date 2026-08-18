@@ -63,6 +63,8 @@ function App() {
               setError("");
               setPassword("");
 
+              window.electronAPI.tcp.getGroups();
+
               return;
             }
 
