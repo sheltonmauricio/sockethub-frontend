@@ -207,4 +207,20 @@ export class TcpClient {
       }
     });
   }
+
+  getMessages(
+    groupId,
+    limit = 20,
+    offset = 0
+  ) {
+    this.send({
+      type: "GET_MESSAGES",
+      requestId: crypto.randomUUID(),
+      payload: {
+        groupId,
+        limit,
+        offset
+      }
+    });
+  }
 }

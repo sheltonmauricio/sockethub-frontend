@@ -29,6 +29,12 @@ interface ElectronTcpApi {
     groupId: number
   ): Promise<void>;
 
+  getMessages(
+    groupId: number,
+    limit?: number,
+    offset?: number
+  ): Promise<void>;
+
   isConnected(): Promise<boolean>;
 
   onMessage(

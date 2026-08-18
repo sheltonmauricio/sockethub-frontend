@@ -55,6 +55,14 @@ contextBridge.exposeInMainWorld(
           groupId
         ),
 
+      getMessages: (groupId, limit = 20, offset = 0) =>
+        ipcRenderer.invoke(
+          "tcp:get-messages",
+          groupId,
+          limit,
+          offset
+        ),
+
       isConnected: () =>
         ipcRenderer.invoke(
           "tcp:is-connected"

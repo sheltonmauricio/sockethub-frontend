@@ -135,6 +135,17 @@ app.whenReady().then(() => {
     }
   );
 
+  ipcMain.handle(
+    "tcp:get-messages",
+    (_, groupId, limit, offset) => {
+      return tcpClient.getMessages(
+        groupId,
+        limit,
+        offset
+      );
+    }
+  );
+
   createWindow();
 
   app.on("activate", () => {
