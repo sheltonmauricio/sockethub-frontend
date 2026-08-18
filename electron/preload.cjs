@@ -25,6 +25,13 @@ contextBridge.exposeInMainWorld(
           message
         ),
 
+      login: (username, password) =>
+        ipcRenderer.invoke(
+          "tcp:login",
+          username,
+          password
+        ),
+
       isConnected: () =>
         ipcRenderer.invoke(
           "tcp:is-connected"
@@ -43,6 +50,24 @@ contextBridge.exposeInMainWorld(
         return () => {
           ipcRenderer.removeListener(
             "tcp:message",
+            listener
+          );
+        };
+      },
+
+      onConnectionChange: (callback) => {
+        const listener = (_, connected) => {
+          callback(connected);
+        };
+
+        ipcRenderer.on(
+          "tcp:connection",
+          listener
+        );
+
+        return () => {
+          ipcRenderer.removeListener(
+            "tcp:connection",
             listener
           );
         };

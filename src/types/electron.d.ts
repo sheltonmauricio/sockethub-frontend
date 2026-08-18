@@ -1,28 +1,39 @@
-export {};
+import type { TcpMessage } from "../protocol/messages";
+
+interface ElectronTcpApi {
+  connect(
+    host: string,
+    port: number
+  ): Promise<boolean>;
+
+  disconnect(): Promise<void>;
+
+  send(message: unknown): Promise<void>;
+
+  login(
+    username: string,
+    password: string
+  ): Promise<void>;
+
+  isConnected(): Promise<boolean>;
+
+  onMessage(
+    callback: (message: TcpMessage) => void
+  ): () => void;
+
+  onConnectionChange(
+    callback: (connected: boolean) => void
+  ): () => void;
+}
+
+interface ElectronAPI {
+  tcp: ElectronTcpApi;
+}
 
 declare global {
   interface Window {
-    electronAPI: {
-      tcp: {
-        connect(
-          host: string,
-          port: number
-        ): Promise<boolean>;
-
-        disconnect(): Promise<void>;
-
-        send(
-          message: unknown
-        ): Promise<void>;
-
-        isConnected(): Promise<boolean>;
-
-        onMessage(
-          callback: (
-            message: unknown
-          ) => void
-        ): () => void;
-      };
-    };
+    electronAPI: ElectronAPI;
   }
 }
+
+export {};

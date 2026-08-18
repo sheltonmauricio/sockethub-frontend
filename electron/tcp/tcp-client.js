@@ -1,25 +1,25 @@
-import {
-  createConnection
-} from "node:net";
+import { createConnection } from "node:net";
 
-import {
-  MessageParser
-} from "../protocol/parser.js";
-
-import {
-  serializeMessage
-} from "../protocol/serializer.js";
+import { MessageParser } from "../protocol/parser.js";
+import { serializeMessage } from "../protocol/serializer.js";
 
 export class TcpClient {
   constructor() {
     this.socket = null;
     this.parser = new MessageParser();
+
     this.connected = false;
+
     this.messageCallback = null;
+    this.connectionCallback = null;
   }
 
   onMessage(callback) {
     this.messageCallback = callback;
+  }
+
+  onConnectionChange(callback) {
+    this.connectionCallback = callback;
   }
 
   connect(host, port) {
@@ -44,6 +44,8 @@ export class TcpClient {
             `TCP conectado a ${host}:${port}`
           );
 
+          this.connectionCallback?.(true);
+
           resolve(true);
         }
       );
@@ -55,17 +57,34 @@ export class TcpClient {
             const messages =
               this.parser.feed(data);
 
-            for (
-              const message of messages
-            ) {
+            for (const message of messages) {
               console.log(
                 "TCP recebido:",
                 message
               );
 
-              if (
-                this.messageCallback
-              ) {
+              /*
+               * Heartbeat:
+               * O backend envia PING e o cliente
+               * precisa responder imediatamente com PONG.
+               */
+              if (message.type === "PING") {
+                this.send({
+                  type: "PONG"
+                });
+
+                continue;
+              }
+
+              /*
+               * PONG recebido como resposta a um
+               * eventual PING enviado pelo cliente.
+               */
+              if (message.type === "PONG") {
+                continue;
+              }
+
+              if (this.messageCallback) {
                 this.messageCallback(
                   message
                 );
@@ -89,6 +108,8 @@ export class TcpClient {
           console.log(
             "TCP desconectado."
           );
+
+          this.connectionCallback?.(false);
         }
       );
 
@@ -101,6 +122,8 @@ export class TcpClient {
             "Erro TCP:",
             error.message
           );
+
+          this.connectionCallback?.(false);
 
           reject(error);
         }
@@ -117,6 +140,8 @@ export class TcpClient {
 
     this.socket = null;
     this.connected = false;
+
+    this.connectionCallback?.(false);
   }
 
   send(message) {

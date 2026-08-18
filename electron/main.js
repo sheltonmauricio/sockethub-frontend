@@ -50,6 +50,17 @@ app.whenReady().then(() => {
     );
   });
 
+  tcpClient.onConnectionChange((connected) => {
+    if (!mainWindow) {
+      return;
+    }
+
+    mainWindow.webContents.send(
+      "tcp:connection",
+      connected
+    );
+  });
+
   ipcMain.handle(
     "tcp:connect",
     async (_, host, port) => {
