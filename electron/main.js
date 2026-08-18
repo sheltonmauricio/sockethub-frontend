@@ -6,6 +6,7 @@ import {
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 
 import { TcpClient } from "./tcp/tcp-client.js";
 
@@ -82,6 +83,20 @@ app.whenReady().then(() => {
     "tcp:send",
     (_, message) => {
       tcpClient.send(message);
+    }
+  );
+
+  ipcMain.handle(
+    "tcp:login",
+    (_, username, password) => {
+      tcpClient.send({
+        type: "LOGIN",
+        requestId: randomUUID(),
+        payload: {
+          username,
+          password
+        }
+      });
     }
   );
 
