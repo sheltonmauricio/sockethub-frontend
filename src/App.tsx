@@ -292,6 +292,40 @@ function App() {
             return;
           }
 
+          if (message.type === "DELETE_GROUP_RESPONSE") {
+            if (message.success) {
+              const deletedGroupId =
+                message.payload?.groupId;
+
+              setGroups((previous) =>
+                previous.filter(
+                  (group) => group.id !== deletedGroupId
+                )
+              );
+
+              if (
+                selectedGroupRef.current?.id ===
+                deletedGroupId
+              ) {
+                setSelectedGroup(null);
+                selectedGroupRef.current = null;
+                setMessages([]);
+                setMessageInput("");
+              }
+
+              setError("");
+
+              return;
+            }
+
+            setError(
+              message.error?.message ??
+                "Não foi possível eliminar o grupo."
+            );
+
+            return;
+          }
+
   
           if (message.type === "NEW_MESSAGE") {
             const newMessage =
@@ -475,6 +509,25 @@ function App() {
       group.id,
       20,
       0
+    );
+  }
+
+  function handleDeleteGroup(
+    groupId: number
+  ): void {
+    const confirmed = window.confirm(
+      "Tem certeza que deseja eliminar este grupo? Todas as mensagens e membros serão removidos permanentemente."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    void window.electronAPI.tcp.deleteGroup(
+      groupId
     );
   }
 
@@ -849,17 +902,39 @@ function App() {
                               </button>
                             )}
 
-                            {isMember && (
+                            {!isMember && (
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleLeaveGroup(
-                                    group.id
-                                  )
+                                  handleJoinGroup(group.id)
+                                }
+                                className="flex-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium transition hover:bg-green-500"
+                              >
+                                Entrar
+                              </button>
+                            )}
+
+                            {group.role === "MEMBER" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleLeaveGroup(group.id)
                                 }
                                 className="flex-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium transition hover:bg-red-500"
                               >
                                 Sair
+                              </button>
+                            )}
+
+                            {group.role === "OWNER" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteGroup(group.id)
+                                }
+                                className="flex-1 rounded-md bg-red-700 px-3 py-1.5 text-xs font-medium transition hover:bg-red-600"
+                              >
+                                Eliminar
                               </button>
                             )}
                           </div>
@@ -899,17 +974,31 @@ function App() {
                           </p>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleLeaveGroup(
-                              selectedGroup.id
-                            )
-                          }
-                          className="rounded-md border border-red-900 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-950"
-                        >
-                          Sair
-                        </button>
+                        {selectedGroup.role === "OWNER" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteGroup(
+                                selectedGroup.id
+                              )
+                            }
+                            className="rounded-md border border-red-900 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-950"
+                          >
+                            Eliminar grupo
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleLeaveGroup(
+                                selectedGroup.id
+                              )
+                            }
+                            className="rounded-md border border-red-900 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-950"
+                          >
+                            Sair
+                          </button>
+                        )}
                       </div>
                     </header>
 

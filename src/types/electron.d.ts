@@ -35,6 +35,10 @@ interface ElectronTcpApi {
     offset?: number
   ): Promise<void>;
 
+  deleteGroup: (
+    groupId: number
+  ) => Promise<void>;
+
   isConnected(): Promise<boolean>;
 
   onMessage(

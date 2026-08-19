@@ -136,6 +136,13 @@ app.whenReady().then(() => {
   );
 
   ipcMain.handle(
+    "tcp:delete-group",
+    (_, groupId) => {
+      return tcpClient.deleteGroup(groupId);
+    }
+  );
+
+  ipcMain.handle(
     "tcp:get-messages",
     (_, groupId, limit, offset) => {
       return tcpClient.getMessages(

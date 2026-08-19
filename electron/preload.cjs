@@ -55,6 +55,12 @@ contextBridge.exposeInMainWorld(
           groupId
         ),
 
+      deleteGroup: (groupId) =>
+        ipcRenderer.invoke(
+          "tcp:delete-group",
+          groupId
+        ),
+
       getMessages: (groupId, limit = 20, offset = 0) =>
         ipcRenderer.invoke(
           "tcp:get-messages",

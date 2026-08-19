@@ -223,4 +223,14 @@ export class TcpClient {
       }
     });
   }
+
+  deleteGroup(groupId) {
+    this.send({
+      type: "DELETE_GROUP",
+      requestId: randomUUID(),
+      payload: {
+        groupId
+      }
+    });
+  }
 }
