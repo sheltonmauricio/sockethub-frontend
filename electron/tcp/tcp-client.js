@@ -215,7 +215,7 @@ export class TcpClient {
   ) {
     this.send({
       type: "GET_MESSAGES",
-      requestId: crypto.randomUUID(),
+      requestId: randomUUID(),
       payload: {
         groupId,
         limit,

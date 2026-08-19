@@ -90,51 +90,6 @@ function App() {
     });
   }
 
-  /*
-   * Formata a data/hora da mensagem.
-   *
-   * Hoje:
-   * 14:35
-   *
-   * Outro dia:
-   * 18/08/2026, 14:35
-   */
-  // function formatMessageDate(
-  //   dateString: string
-  // ): string {
-  //   const date = new Date(dateString);
-
-  //   if (Number.isNaN(date.getTime())) {
-  //     return "";
-  //   }
-
-  //   const now = new Date();
-
-  //   const isToday =
-  //     date.getDate() === now.getDate() &&
-  //     date.getMonth() === now.getMonth() &&
-  //     date.getFullYear() ===
-  //       now.getFullYear();
-
-  //   if (isToday) {
-  //     return date.toLocaleTimeString(
-  //       "pt-PT",
-  //       {
-  //         hour: "2-digit",
-  //         minute: "2-digit"
-  //       }
-  //     );
-  //   }
-
-  //   return date.toLocaleString("pt-PT", {
-  //     day: "2-digit",
-  //     month: "2-digit",
-  //     year: "numeric",
-  //     hour: "2-digit",
-  //     minute: "2-digit"
-  //   });
-  // }
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
       behavior: "smooth"
@@ -153,6 +108,9 @@ function App() {
 
           if (!connected) {
             setLoading(false);
+            setError(
+              "A conexão com o servidor foi perdida."
+            );
           }
         }
       );
@@ -166,8 +124,7 @@ function App() {
           );
 
           if (
-            message.type ===
-            "LOGIN_RESPONSE"
+            message.type === "LOGIN_RESPONSE"
           ) {
             setLoading(false);
 
@@ -175,14 +132,22 @@ function App() {
               message.success &&
               message.payload?.user
             ) {
-              setUser(
-                message.payload.user
-              );
+              setUser(message.payload.user);
 
               setError("");
-              setPassword("");
 
               void window.electronAPI.tcp.getGroups();
+
+              const currentGroup =
+                selectedGroupRef.current;
+
+              if (currentGroup) {
+                void window.electronAPI.tcp.getMessages(
+                  currentGroup.id,
+                  20,
+                  0
+                );
+              }
 
               return;
             }
@@ -248,6 +213,8 @@ function App() {
                 message.payload.group;
 
               setSelectedGroup(group);
+              selectedGroupRef.current = group;
+
               setMessages([]);
               setError("");
 
@@ -499,6 +466,8 @@ function App() {
     group: Group
   ): void {
     setSelectedGroup(group);
+    selectedGroupRef.current = group;
+
     setMessages([]);
     setError("");
 
@@ -539,6 +508,33 @@ function App() {
     setMessageInput("");
   }
 
+  function handleReconnect(): void {
+    setError("");
+    setConnectionState("connecting");
+
+    void window.electronAPI.tcp
+      .connect(
+        TCP_CONFIG.host,
+        TCP_CONFIG.port
+      )
+      .then(() => {
+        if (username.trim() && password) {
+          setLoading(true);
+
+          void window.electronAPI.tcp.login(
+            username.trim(),
+            password
+          );
+        }
+      })
+      .catch(() => {
+        setConnectionState("disconnected");
+        setError(
+          "Não foi possível reconectar ao servidor."
+        );
+      });
+  }
+
   function formatDateLabel(
     dateString: string
   ): string {
@@ -571,21 +567,35 @@ function App() {
             </p>
           </div>
 
+          
           {user && (
-            <div className="text-right">
-              <p className="font-medium">
-                {user.username}
-              </p>
+            <div className="flex items-center gap-4">
+              {connectionState === "disconnected" && (
+                <button
+                  type="button"
+                  onClick={handleReconnect}
+                  className="rounded-md border border-yellow-700 px-3 py-1.5 text-xs text-yellow-400 transition hover:bg-yellow-950/40"
+                >
+                  Reconectar
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="mt-1 text-sm text-red-400 transition hover:text-red-300"
-              >
-                Terminar sessão
-              </button>
+              <div className="text-right">
+                <p className="font-medium">
+                  {user.username}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="mt-1 text-sm text-red-400 transition hover:text-red-300"
+                >
+                  Terminar sessão
+                </button>
+              </div>
             </div>
           )}
+
         </header>
 
         {!user ? (
@@ -596,25 +606,33 @@ function App() {
                   Estado TCP
                 </span>
 
-                <span
-                  className={
-                    connectionState ===
-                    "connected"
-                      ? "text-green-400"
-                      : connectionState ===
-                          "connecting"
-                        ? "text-yellow-400"
-                        : "text-red-400"
-                  }
-                >
-                  {connectionState ===
-                  "connected"
-                    ? "Conectado"
-                    : connectionState ===
-                        "connecting"
-                      ? "Conectando..."
-                      : "Desconectado"}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={
+                      connectionState === "connected"
+                        ? "text-green-400"
+                        : connectionState === "connecting"
+                          ? "text-yellow-400"
+                          : "text-red-400"
+                    }
+                  >
+                    {connectionState === "connected"
+                      ? "Conectado"
+                      : connectionState === "connecting"
+                        ? "Conectando..."
+                        : "Desconectado"}
+                  </span>
+
+                  {connectionState === "disconnected" && (
+                    <button
+                      type="button"
+                      onClick={handleReconnect}
+                      className="rounded-md border border-slate-700 px-3 py-1.5 text-xs transition hover:bg-slate-800"
+                    >
+                      Reconectar
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
