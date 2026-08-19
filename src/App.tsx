@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import {useEffect, useRef, useState} from "react";
 import { TCP_CONFIG } from "./config";
+
 
 type ConnectionState =
   | "connecting"
@@ -14,17 +15,19 @@ interface User {
 interface Group {
   id: number;
   name: string;
-  ownerId?: number;
-  memberCount?: number;
+  ownerId: number;
+  role?: "OWNER" | "MEMBER" | null;
 }
 
 interface Message {
   id: number;
   groupId: number;
-  userId: number;
-  username?: string;
+  sender: {
+    id: number;
+    username: string;
+  };
   content: string;
-  createdAt?: string;
+  createdAt: string;
 }
 
 function App() {
@@ -46,6 +49,97 @@ function App() {
   const [groupName, setGroupName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const selectedGroupRef = useRef<Group | null>(null);
+
+  /*
+   * Mantém as mensagens em ordem cronológica:
+   *
+   * mais antiga
+   *      ↓
+   * ...
+   *      ↓
+   * mais recente
+   */
+  function sortMessages(
+    messages: Message[]
+  ): Message[] {
+    return [...messages].sort((a, b) => {
+      const dateA =
+        new Date(a.createdAt).getTime();
+
+      const dateB =
+        new Date(b.createdAt).getTime();
+
+      if (dateA !== dateB) {
+        return dateA - dateB;
+      }
+
+      return a.id - b.id;
+    });
+  }
+
+  /*
+   * Faz o chat descer para a mensagem
+   * mais recente.
+   */
+  function scrollToBottom(): void {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
+  }
+
+  /*
+   * Formata a data/hora da mensagem.
+   *
+   * Hoje:
+   * 14:35
+   *
+   * Outro dia:
+   * 18/08/2026, 14:35
+   */
+  // function formatMessageDate(
+  //   dateString: string
+  // ): string {
+  //   const date = new Date(dateString);
+
+  //   if (Number.isNaN(date.getTime())) {
+  //     return "";
+  //   }
+
+  //   const now = new Date();
+
+  //   const isToday =
+  //     date.getDate() === now.getDate() &&
+  //     date.getMonth() === now.getMonth() &&
+  //     date.getFullYear() ===
+  //       now.getFullYear();
+
+  //   if (isToday) {
+  //     return date.toLocaleTimeString(
+  //       "pt-PT",
+  //       {
+  //         hour: "2-digit",
+  //         minute: "2-digit"
+  //       }
+  //     );
+  //   }
+
+  //   return date.toLocaleString("pt-PT", {
+  //     day: "2-digit",
+  //     month: "2-digit",
+  //     year: "numeric",
+  //     hour: "2-digit",
+  //     minute: "2-digit"
+  //   });
+  // }
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
+  }, [messages]);
 
   useEffect(() => {
     const removeConnectionListener =
@@ -105,10 +199,16 @@ function App() {
             message.type ===
             "GET_GROUPS_RESPONSE"
           ) {
-            setGroups(
-              (message.payload?.groups ??
-                []) as Group[]
-            );
+            if (message.success) {
+              setGroups(
+                message.payload?.groups ?? []
+              );
+            } else {
+              setError(
+                message.error?.message ??
+                  "Não foi possível carregar os grupos."
+              );
+            }
 
             return;
           }
@@ -140,32 +240,22 @@ function App() {
           ) {
             setLoading(false);
 
-            if (message.success) {
+            if (
+              message.success &&
+              message.payload?.group
+            ) {
+              const group =
+                message.payload.group;
+
+              setSelectedGroup(group);
+              setMessages([]);
               setError("");
 
-              const groupId =
-                message.payload?.groupId;
-
-              if (
-                typeof groupId === "number"
-              ) {
-                const group =
-                  groups.find(
-                    (item) =>
-                      item.id === groupId
-                  );
-
-                if (group) {
-                  setSelectedGroup(group);
-                  setMessages([]);
-
-                  void window.electronAPI.tcp.getMessages(
-                    group.id,
-                    20,
-                    0
-                  );
-                }
-              }
+              void window.electronAPI.tcp.getMessages(
+                group.id,
+                20,
+                0
+              );
 
               void window.electronAPI.tcp.getGroups();
 
@@ -186,15 +276,9 @@ function App() {
           ) {
             if (message.success) {
               setError("");
-
-              if (
-                selectedGroup &&
-                message.payload?.groupId ===
-                  selectedGroup.id
-              ) {
-                setSelectedGroup(null);
-                setMessages([]);
-              }
+              setSelectedGroup(null);
+              setMessages([]);
+              setMessageInput("");
 
               void window.electronAPI.tcp.getGroups();
 
@@ -213,34 +297,69 @@ function App() {
             message.type ===
             "GET_MESSAGES_RESPONSE"
           ) {
-            setMessages(
-              (message.payload?.messages ??
-                []) as Message[]
-            );
+            if (message.success) {
+              const receivedMessages = 
+                message.payload?.messages ?? [];
+
+              setMessages(
+                sortMessages(receivedMessages)
+              );
+            } else {
+              setError(
+                message.error?.message ??
+                  "Não foi possível carregar as mensagens."
+              );
+            }
 
             return;
           }
 
-          if (
-            message.type ===
-            "SEND_MESSAGE_RESPONSE"
-          ) {
+          if (message.type === "SEND_MESSAGE_RESPONSE") {
             if (!message.success) {
               setError(
                 message.error?.message ??
                   "Não foi possível enviar a mensagem."
               );
+            }
 
+            return;
+          }
+
+  
+          if (message.type === "NEW_MESSAGE") {
+            const newMessage =
+              message.payload?.message as
+                | Message
+                | undefined;
+
+            if (!newMessage) {
               return;
             }
 
-            if (selectedGroup) {
-              void window.electronAPI.tcp.getMessages(
-                selectedGroup.id,
-                20,
-                0
-              );
+            const currentGroup =
+              selectedGroupRef.current;
+
+            if (
+              !currentGroup ||
+              newMessage.groupId !== currentGroup.id
+            ) {
+              return;
             }
+
+            setMessages((previous) => {
+              if (
+                previous.some(
+                  (item) => item.id === newMessage.id
+                )
+              ) {
+                return previous;
+              }
+
+              return sortMessages([
+                ...previous,
+                newMessage
+              ]);
+            });
 
             return;
           }
@@ -267,7 +386,23 @@ function App() {
       removeConnectionListener();
       removeMessageListener();
     };
-  }, [groups, selectedGroup]);
+  }, []);
+
+  /*
+   * Sempre que as mensagens mudarem,
+   * posiciona o chat na mensagem mais recente.
+   */
+  useEffect(() => {
+    if (messages.length > 0) {
+      requestAnimationFrame(() => {
+        scrollToBottom();
+      });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    selectedGroupRef.current = selectedGroup;
+  }, [selectedGroup]);
 
   function handleLogin(
     event: React.FormEvent<HTMLFormElement>
@@ -314,6 +449,7 @@ function App() {
     setSelectedGroup(null);
     setMessages([]);
     setMessageInput("");
+    setError("");
   }
 
   function handleCreateGroup(
@@ -403,6 +539,20 @@ function App() {
     setMessageInput("");
   }
 
+  function formatDateLabel(
+    dateString: string
+  ): string {
+    return new Date(dateString)
+      .toLocaleDateString(
+        "pt-PT",
+        {
+          day: "2-digit",
+          month: "long",
+          year: "numeric"
+        }
+      );
+  }
+
   const isConnected =
     connectionState === "connected";
 
@@ -410,7 +560,6 @@ function App() {
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col p-6">
 
-        {/* Header */}
         <header className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">
@@ -439,7 +588,6 @@ function App() {
           )}
         </header>
 
-        {/* Login */}
         {!user ? (
           <section className="mx-auto w-full max-w-md">
             <div className="mb-6 rounded-lg border border-slate-800 bg-slate-900 p-4">
@@ -546,7 +694,6 @@ function App() {
             </form>
           </section>
         ) : (
-          /* Aplicação */
           <section className="flex min-h-0 flex-1 flex-col">
 
             {error && (
@@ -555,9 +702,8 @@ function App() {
               </div>
             )}
 
-            <div className="grid min-h-[600px] flex-1 grid-cols-1 overflow-hidden rounded-lg border border-slate-800 bg-slate-900 md:grid-cols-[320px_1fr]">
+            <div className="grid h-[calc(100vh-140px)] min-h-0 grid-cols-1 overflow-hidden rounded-lg border border-slate-800 bg-slate-900 md:grid-cols-[320px_1fr]"> 
 
-              {/* Sidebar */}
               <aside className="border-b border-slate-800 md:border-b-0 md:border-r">
 
                 <div className="border-b border-slate-800 p-4">
@@ -624,6 +770,12 @@ function App() {
                         selectedGroup?.id ===
                         group.id;
 
+                      const isMember =
+                        group.role ===
+                          "OWNER" ||
+                        group.role ===
+                          "MEMBER";
+
                       return (
                         <div
                           key={group.id}
@@ -649,39 +801,49 @@ function App() {
                                 </h3>
 
                                 <p className="mt-1 text-xs text-slate-500">
-                                  ID: {group.id}
-                                  {group.memberCount !==
-                                    undefined &&
-                                    ` • ${group.memberCount} membros`}
+                                  Grupo #{group.id}
                                 </p>
                               </div>
+
+                              {group.role && (
+                                <span className="shrink-0 text-xs text-blue-400">
+                                  {group.role ===
+                                  "OWNER"
+                                    ? "Dono"
+                                    : "Membro"}
+                                </span>
+                              )}
                             </div>
                           </button>
 
                           <div className="mt-3 flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleJoinGroup(
-                                  group.id
-                                )
-                              }
-                              className="flex-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium transition hover:bg-green-500"
-                            >
-                              Entrar
-                            </button>
+                            {!isMember && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleJoinGroup(
+                                    group.id
+                                  )
+                                }
+                                className="flex-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium transition hover:bg-green-500"
+                              >
+                                Entrar
+                              </button>
+                            )}
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleLeaveGroup(
-                                  group.id
-                                )
-                              }
-                              className="flex-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium transition hover:bg-red-500"
-                            >
-                              Sair
-                            </button>
+                            {isMember && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleLeaveGroup(
+                                    group.id
+                                  )
+                                }
+                                className="flex-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium transition hover:bg-red-500"
+                              >
+                                Sair
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -690,8 +852,7 @@ function App() {
                 </div>
               </aside>
 
-              {/* Chat */}
-              <section className="flex min-h-0 flex-col">
+              <section className="flex min-h-0 h-full flex-col overflow-hidden">
 
                 {!selectedGroup ? (
                   <div className="flex flex-1 items-center justify-center p-8 text-center">
@@ -708,9 +869,8 @@ function App() {
                   </div>
                 ) : (
                   <>
-                    {/* Chat header */}
                     <header className="border-b border-slate-800 p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex  items-center justify-between">
                         <div>
                           <h2 className="font-semibold">
                             {selectedGroup.name}
@@ -735,8 +895,10 @@ function App() {
                       </div>
                     </header>
 
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div
+                      id="messages-container"
+                      className="min-h-0 flex-1 overflow-y-auto p-4"
+                    >
                       {messages.length === 0 ? (
                         <div className="flex h-full items-center justify-center text-center">
                           <div>
@@ -751,18 +913,42 @@ function App() {
                           </div>
                         </div>
                       ) : (
+                        
                         <div className="space-y-3">
-                          {messages.map(
-                            (message) => {
-                              const ownMessage =
-                                message.userId ===
-                                user.id;
+                          {messages.map((message, index) => {
+                            const ownMessage =
+                              message.sender.id === user?.id;
 
-                              return (
+                            const currentDate =
+                              message.createdAt
+                                ? formatDateLabel(
+                                    message.createdAt
+                                  )
+                                : "";
+
+                            const previousDate =
+                              index > 0 &&
+                              messages[index - 1].createdAt
+                                ? formatDateLabel(
+                                    messages[index - 1]
+                                      .createdAt!
+                                  )
+                                : "";
+
+                            const showDate =
+                              currentDate !== previousDate;
+
+                            return (
+                              <div key={message.id}>
+                                {showDate && (
+                                  <div className="my-4 flex justify-center">
+                                    <span className="rounded-full bg-slate-800 px-4 py-1 text-xs text-slate-400">
+                                      {currentDate}
+                                    </span>
+                                  </div>
+                                )}
+
                                 <div
-                                  key={
-                                    message.id
-                                  }
                                   className={`flex ${
                                     ownMessage
                                       ? "justify-end"
@@ -777,26 +963,22 @@ function App() {
                                     }`}
                                   >
                                     {!ownMessage &&
-                                      message.username && (
+                                      message.sender.username && (
                                         <p className="mb-1 text-xs font-medium text-slate-400">
-                                          {
-                                            message.username
-                                          }
+                                          {message.sender.username}
                                         </p>
                                       )}
 
                                     <p className="break-words text-sm">
-                                      {
-                                        message.content
-                                      }
+                                      {message.content}
                                     </p>
 
                                     {message.createdAt && (
-                                      <p className="mt-1 text-[10px] opacity-60">
+                                      <p className="mt-1 text-right text-[10px] opacity-60">
                                         {new Date(
                                           message.createdAt
                                         ).toLocaleTimeString(
-                                          [],
+                                          "pt-PT",
                                           {
                                             hour: "2-digit",
                                             minute: "2-digit"
@@ -806,14 +988,16 @@ function App() {
                                     )}
                                   </div>
                                 </div>
-                              );
-                            }
-                          )}
+                              </div>
+                            );
+                          })}
+
+                          <div ref={messagesEndRef} />
                         </div>
+
                       )}
                     </div>
 
-                    {/* Message input */}
                     <form
                       onSubmit={
                         handleSendMessage
